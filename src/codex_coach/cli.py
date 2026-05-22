@@ -166,8 +166,11 @@ def _doctor(paths) -> int:
     print(f"command: {command} {'OK' if command.exists() else 'not installed'}")
     plugin = paths.home / "plugins" / "codex-coach" / ".codex-plugin" / "plugin.json"
     print(f"plugin: {plugin} {'OK' if plugin.exists() else 'not installed'}")
-    skill = paths.home / ".agents" / "skills" / "codex-coach" / "SKILL.md"
+    skill = paths.codex_home / "skills" / "codex-coach" / "SKILL.md"
+    legacy_skill = paths.home / ".agents" / "skills" / "codex-coach" / "SKILL.md"
     print(f"skill: {skill} {'OK' if skill.exists() else 'not installed'}")
+    if legacy_skill.exists():
+        print(f"legacy_skill: {legacy_skill} duplicate")
     return 0 if paths.codex_home.exists() else 1
 
 

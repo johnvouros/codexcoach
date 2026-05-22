@@ -19,7 +19,7 @@ def install_from_source(source_root: Path, paths: CoachPaths, *, schedule: str =
         _copy_app(source_root, paths.app_dir)
     _install_command(paths)
     plugin_path = _install_plugin(source_root, paths.home)
-    skill_paths = _install_user_skills(source_root, paths.home)
+    skill_paths = _install_user_skills(source_root, paths)
     marketplace = _update_marketplace(paths.home, plugin_path)
     scheduler = _write_scheduler(paths, schedule=schedule)
     return {
@@ -90,20 +90,28 @@ def _install_plugin(source_root: Path, home: Path) -> Path:
     return plugin_root
 
 
-def _install_user_skills(source_root: Path, home: Path) -> list[Path]:
+def _install_user_skills(source_root: Path, paths: CoachPaths) -> list[Path]:
     skill_source = source_root / "skills" / PLUGIN_NAME
-    targets = [
-        home / ".agents" / "skills" / PLUGIN_NAME,
-        home / ".codex" / "skills" / PLUGIN_NAME,
-    ]
-    installed: list[Path] = []
-    for target in targets:
-        if target.exists():
-            shutil.rmtree(target)
-        target.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copytree(skill_source, target)
-        installed.append(target)
-    return installed
+    target = paths.codex_home / "skills" / PLUGIN_NAME
+    if target.exists():
+        shutil.rmtree(target)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copytree(skill_source, target)
+    _remove_legacy_duplicate_skill(paths.home, target)
+    return [target]
+
+
+def _remove_legacy_duplicate_skill(home: Path, canonical_target: Path) -> None:
+    legacy_target = home / ".agents" / "skills" / PLUGIN_NAME
+    if legacy_target.resolve() == canonical_target.resolve() or not legacy_target.exists():
+        return
+    skill_file = legacy_target / "SKILL.md"
+    try:
+        skill_text = skill_file.read_text(encoding="utf-8")
+    except OSError:
+        return
+    if f"name: {PLUGIN_NAME}" in skill_text:
+        shutil.rmtree(legacy_target)
 
 
 def _update_marketplace(home: Path, plugin_path: Path) -> Path:

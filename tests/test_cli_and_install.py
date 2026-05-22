@@ -116,7 +116,8 @@ class CliAndInstallTests(unittest.TestCase):
 
             self.assertTrue(Path(result["command"]).exists())
             self.assertTrue((home / "plugins" / "codex-coach" / ".codex-plugin" / "plugin.json").exists())
-            self.assertTrue((home / ".agents" / "skills" / "codex-coach" / "SKILL.md").exists())
+            self.assertTrue((home / ".codex" / "skills" / "codex-coach" / "SKILL.md").exists())
+            self.assertFalse((home / ".agents" / "skills" / "codex-coach" / "SKILL.md").exists())
             marketplace = home / ".agents" / "plugins" / "marketplace.json"
             self.assertTrue(marketplace.exists())
             data = json.loads(marketplace.read_text(encoding="utf-8"))
@@ -137,6 +138,19 @@ class CliAndInstallTests(unittest.TestCase):
             self.assertTrue(paths.app_dir.exists())
             self.assertTrue((paths.app_dir / "src" / "codex_coach" / "cli.py").exists())
             self.assertTrue(Path(result["command"]).exists())
+
+    def test_install_removes_legacy_duplicate_skill(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp)
+            paths = default_paths(home=home, codex_home=home / ".codex", coach_home=home / ".codex-coach")
+            legacy = home / ".agents" / "skills" / "codex-coach"
+            legacy.mkdir(parents=True)
+            (legacy / "SKILL.md").write_text("---\nname: codex-coach\n---\nold copy\n", encoding="utf-8")
+
+            install_from_source(ROOT, paths, schedule="none")
+
+            self.assertTrue((home / ".codex" / "skills" / "codex-coach" / "SKILL.md").exists())
+            self.assertFalse(legacy.exists())
 
     def test_cli_accepts_daily_schedule_opt_in(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
