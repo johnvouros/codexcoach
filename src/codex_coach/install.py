@@ -15,7 +15,8 @@ def install_from_source(source_root: Path, paths: CoachPaths, *, schedule: str =
     paths.ensure_output_dirs()
     paths.coach_home.mkdir(parents=True, exist_ok=True)
     _write_default_config(paths, schedule=schedule)
-    _copy_app(source_root, paths.app_dir)
+    if source_root != paths.app_dir.resolve():
+        _copy_app(source_root, paths.app_dir)
     _install_command(paths)
     plugin_path = _install_plugin(source_root, paths.home)
     skill_paths = _install_user_skills(source_root, paths.home)

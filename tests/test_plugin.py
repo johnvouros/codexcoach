@@ -13,7 +13,7 @@ class PluginTests(unittest.TestCase):
         manifest = json.loads((ROOT / ".codex-plugin" / "plugin.json").read_text(encoding="utf-8"))
 
         self.assertEqual(manifest["name"], "codex-coach")
-        self.assertEqual(manifest["version"], "0.1.2")
+        self.assertEqual(manifest["version"], "0.1.3")
         self.assertEqual(manifest["skills"], "./skills/")
         self.assertEqual(manifest["interface"]["displayName"], "Codex Coach")
         self.assertLessEqual(len(manifest["interface"]["defaultPrompt"]), 3)
@@ -31,7 +31,7 @@ class PluginTests(unittest.TestCase):
         package = json.loads((ROOT / "package.json").read_text(encoding="utf-8"))
 
         self.assertEqual(package["name"], "codex-coach")
-        self.assertEqual(package["version"], "0.1.2")
+        self.assertEqual(package["version"], "0.1.3")
         self.assertEqual(package["bin"]["codex-coach"], "bin/codex-coach.js")
         self.assertIn("assets/", package["files"])
         self.assertTrue((ROOT / "bin" / "codex-coach.js").exists())

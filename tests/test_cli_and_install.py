@@ -126,6 +126,18 @@ class CliAndInstallTests(unittest.TestCase):
             self.assertIn(str(home / ".local" / "bin" / "codex-coach"), removed)
             self.assertFalse((home / "plugins" / "codex-coach").exists())
 
+    def test_reinstall_from_installed_app_does_not_delete_itself(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp)
+            paths = default_paths(home=home, codex_home=home / ".codex", coach_home=home / ".codex-coach")
+            install_from_source(ROOT, paths, schedule="none")
+
+            result = install_from_source(paths.app_dir, paths, schedule="none")
+
+            self.assertTrue(paths.app_dir.exists())
+            self.assertTrue((paths.app_dir / "src" / "codex_coach" / "cli.py").exists())
+            self.assertTrue(Path(result["command"]).exists())
+
     def test_cli_accepts_daily_schedule_opt_in(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             home = Path(tmp)
