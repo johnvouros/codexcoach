@@ -58,9 +58,14 @@ class ScanAccumulator:
     project_efforts: dict[str, Counter] = field(default_factory=lambda: defaultdict(Counter))
     project_verification_tools: dict[str, Counter] = field(default_factory=lambda: defaultdict(Counter))
     project_prompt_scores: dict[str, list[int]] = field(default_factory=lambda: defaultdict(list))
+    project_token_totals: dict[str, Counter] = field(default_factory=lambda: defaultdict(Counter))
     prompt_scores: list[dict[str, Any]] = field(default_factory=list)
     error_counts: Counter = field(default_factory=Counter)
     verification_tools: Counter = field(default_factory=Counter)
+    token_totals: Counter = field(default_factory=Counter)
+    max_model_context_window: int = 0
+    max_last_input_tokens: int = 0
+    max_last_uncached_input_tokens: int = 0
     compacted_sessions: set[str] = field(default_factory=set)
     current_file_session: dict[str, str] = field(default_factory=dict)
 
@@ -90,6 +95,7 @@ class ScanAccumulator:
                     self.project_efforts[cwd],
                     self.project_prompt_scores[cwd],
                     verification_tool_calls,
+                    self.project_token_totals[cwd],
                 )
             )
         projects.sort(key=lambda item: (item["user_messages"], item["tool_calls"], item["turns"]), reverse=True)
@@ -126,6 +132,13 @@ class ScanAccumulator:
             "tools": dict(self.tool_counts.most_common()),
             "verification_tools": dict(self.verification_tools.most_common()),
             "errors": dict(self.error_counts.most_common()),
+            "token_efficiency": {
+                "status": "observed" if self.token_totals["token_count_events"] else "not_available",
+                "usage": _token_summary(self.token_totals, turns=self.totals["turns"]),
+                "max_model_context_window": self.max_model_context_window,
+                "max_last_input_tokens": self.max_last_input_tokens,
+                "max_last_uncached_input_tokens": self.max_last_uncached_input_tokens,
+            },
             "prompt_quality": {
                 "average_score": avg_prompt,
                 "categories": dict(prompt_categories),
@@ -203,7 +216,7 @@ def _scan_file(path: Path, acc: ScanAccumulator, *, since_dt) -> None:
             _handle_response_item(payload, acc, current_cwd)
             continue
         if event_type == "event_msg":
-            _handle_event_msg(payload, acc)
+            _handle_event_msg(payload, acc, current_cwd)
             continue
         if event_type == "compacted":
             acc.totals["compactions"] += 1
@@ -305,7 +318,9 @@ def _handle_response_item(payload: dict[str, Any], acc: ScanAccumulator, cwd: st
         acc.totals["reasoning_items"] += 1
 
 
-def _handle_event_msg(payload: dict[str, Any], acc: ScanAccumulator) -> None:
+def _handle_event_msg(payload: dict[str, Any], acc: ScanAccumulator, cwd: str) -> None:
+    if payload.get("type") == "token_count":
+        _handle_token_count(payload, acc, cwd)
     message = _content_text(payload.get("message") or payload.get("text") or payload)
     _count_errors(message, acc)
 
@@ -317,6 +332,7 @@ def _project_capsule(
     efforts: Counter,
     prompt_scores: list[int],
     verification_tool_calls: int,
+    token_totals: Counter,
 ) -> dict[str, Any]:
     prompt_average = round(sum(prompt_scores) / len(prompt_scores), 2) if prompt_scores else 0.0
     workflow = _infer_workflow(tools, counts)
@@ -332,6 +348,7 @@ def _project_capsule(
         "prompt_quality_average": prompt_average,
         "top_tools": dict(tools.most_common(5)),
         "effort_mix": dict(efforts.most_common()),
+        "token_usage": _token_summary(token_totals, turns=counts["turns"]),
         "likely_workflow": workflow,
         "recommended_instruction": instruction,
         "skill_candidate": counts["turns"] >= 3 or counts["tool_calls"] >= 10,
@@ -380,6 +397,69 @@ def _content_text(value: Any) -> str:
     if isinstance(value, dict):
         return str(value.get("text") or value.get("content") or value.get("message") or "")
     return str(value)
+
+
+def _handle_token_count(payload: dict[str, Any], acc: ScanAccumulator, cwd: str) -> None:
+    info = payload.get("info")
+    if not isinstance(info, dict):
+        return
+    usage = info.get("last_token_usage")
+    if not isinstance(usage, dict):
+        return
+
+    input_tokens = _int_token(usage.get("input_tokens"))
+    cached_input_tokens = _int_token(usage.get("cached_input_tokens"))
+    output_tokens = _int_token(usage.get("output_tokens"))
+    reasoning_output_tokens = _int_token(usage.get("reasoning_output_tokens"))
+    total_tokens = _int_token(usage.get("total_tokens"))
+    uncached_input_tokens = max(0, input_tokens - cached_input_tokens)
+
+    values = {
+        "token_count_events": 1,
+        "input_tokens": input_tokens,
+        "cached_input_tokens": cached_input_tokens,
+        "uncached_input_tokens": uncached_input_tokens,
+        "output_tokens": output_tokens,
+        "reasoning_output_tokens": reasoning_output_tokens,
+        "total_tokens": total_tokens,
+    }
+    acc.token_totals.update(values)
+    acc.project_token_totals[cwd].update(values)
+
+    acc.max_last_input_tokens = max(acc.max_last_input_tokens, input_tokens)
+    acc.max_last_uncached_input_tokens = max(acc.max_last_uncached_input_tokens, uncached_input_tokens)
+    context_window = _int_token(info.get("model_context_window"))
+    acc.max_model_context_window = max(acc.max_model_context_window, context_window)
+
+
+def _token_summary(tokens: Counter, *, turns: int) -> dict[str, Any]:
+    input_tokens = int(tokens["input_tokens"])
+    cached_input_tokens = int(tokens["cached_input_tokens"])
+    uncached_input_tokens = int(tokens["uncached_input_tokens"])
+    output_tokens = int(tokens["output_tokens"])
+    total_tokens = int(tokens["total_tokens"])
+    turn_count = max(1, int(turns or 0))
+    return {
+        "events": int(tokens["token_count_events"]),
+        "input_tokens": input_tokens,
+        "cached_input_tokens": cached_input_tokens,
+        "uncached_input_tokens": uncached_input_tokens,
+        "output_tokens": output_tokens,
+        "reasoning_output_tokens": int(tokens["reasoning_output_tokens"]),
+        "total_tokens": total_tokens,
+        "cache_ratio": round(cached_input_tokens / input_tokens, 3) if input_tokens else 0.0,
+        "uncached_ratio": round(uncached_input_tokens / input_tokens, 3) if input_tokens else 0.0,
+        "input_tokens_per_turn": round(input_tokens / turn_count, 1) if input_tokens else 0.0,
+        "uncached_input_tokens_per_turn": round(uncached_input_tokens / turn_count, 1) if uncached_input_tokens else 0.0,
+        "output_tokens_per_turn": round(output_tokens / turn_count, 1) if output_tokens else 0.0,
+    }
+
+
+def _int_token(value: Any) -> int:
+    try:
+        return max(0, int(value or 0))
+    except (TypeError, ValueError):
+        return 0
 
 
 def _looks_like_verification(tool_name: str, arguments: str) -> bool:

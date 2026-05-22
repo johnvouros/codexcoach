@@ -10,6 +10,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from codex_coach.instruction_audit import analyze_instructions
 from codex_coach.parser import scan_logs
+from codex_coach.reports import write_instruction_suggestion_files
 
 
 def write_session(codex_home: Path, cwd: Path, *, tool_calls: int = 0) -> None:
@@ -95,6 +96,12 @@ class InstructionAuditTests(unittest.TestCase):
             self.assertIn("Active project has no discovered AGENTS.md", titles)
             suggestion_titles = {item["title"] for item in audit["suggestions"]}
             self.assertIn("Add a small project playbook", suggestion_titles)
+
+            written = write_instruction_suggestion_files(audit, home / ".codex-coach" / "suggestions")
+            self.assertTrue(written)
+            content = written[0].read_text(encoding="utf-8")
+            self.assertIn("Paste into:", content)
+            self.assertIn("```md", content)
 
 
 if __name__ == "__main__":

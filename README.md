@@ -82,6 +82,7 @@ Suggest custom instruction changes
 - Project capsules: redacted per-project workflow summaries with suggested local instructions.
 - Prompt rewrites: safe templates for vague prompts without storing full prompt text.
 - Confidence-scored suggestions: low, medium, or high confidence improvement notes.
+- Token efficiency: cached vs uncached input, output, routing, and context-budget recommendations.
 - Beginner and expert report modes.
 - Skill opportunities: repeated workflow patterns that may deserve a reusable Codex skill.
 - Real-time prompt linting through `codex-coach lint-prompt`.
