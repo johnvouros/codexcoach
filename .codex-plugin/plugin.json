@@ -1,0 +1,25 @@
+{
+  "name": "codex-coach",
+  "version": "0.1.1",
+  "description": "Local-first Codex usage coach that analyzes logs and suggests workflow improvements.",
+  "author": {
+    "name": "Codex Coach Contributors"
+  },
+  "license": "MIT",
+  "keywords": ["codex", "coach", "usage", "prompting", "productivity"],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Codex Coach",
+    "shortDescription": "Analyze local Codex habits and suggest better usage patterns.",
+    "longDescription": "Codex Coach reads local Codex session logs, creates redacted weekly reports, and suggests reviewable custom instruction or project-context improvements without uploading private data.",
+    "developerName": "Codex Coach Contributors",
+    "category": "Productivity",
+    "capabilities": ["Local", "Analyze", "Read"],
+    "defaultPrompt": [
+      "Coach my Codex usage",
+      "Show my weekly report",
+      "Suggest instruction changes"
+    ],
+    "brandColor": "#22C55E"
+  }
+}

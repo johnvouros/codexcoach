@@ -1,0 +1,36 @@
+[build-system]
+requires = ["hatchling>=1.26"]
+build-backend = "hatchling.build"
+
+[project]
+name = "codex-coach"
+version = "0.1.1"
+description = "Local-first Codex usage coach and plugin"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+authors = [{ name = "Codex Coach Contributors" }]
+keywords = ["codex", "ai", "developer-tools", "analytics", "prompting"]
+dependencies = []
+
+[project.urls]
+Homepage = "https://github.com/johnvouros/codexcoach"
+Repository = "https://github.com/johnvouros/codexcoach"
+Issues = "https://github.com/johnvouros/codexcoach/issues"
+
+[project.scripts]
+codex-coach = "codex_coach.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/codex_coach"]
+
+[tool.hatch.build.targets.sdist]
+include = [
+  "/assets",
+  "/src",
+  "/skills",
+  "/.codex-plugin",
+  "/README.md",
+  "/install.sh",
+  "/install.ps1",
+]

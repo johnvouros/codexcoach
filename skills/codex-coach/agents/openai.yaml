@@ -1,0 +1,8 @@
+interface:
+  display_name: "Codex Coach"
+  short_description: "Analyze local Codex habits and usage."
+  brand_color: "#22C55E"
+  default_prompt: "Use $codex-coach to analyze my Codex usage this week."
+
+policy:
+  allow_implicit_invocation: true

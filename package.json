@@ -1,0 +1,49 @@
+{
+  "name": "codex-coach",
+  "version": "0.1.1",
+  "description": "Local-first Codex usage coach and plugin",
+  "license": "MIT",
+  "author": "Codex Coach Contributors",
+  "homepage": "https://github.com/johnvouros/codexcoach#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/johnvouros/codexcoach.git"
+  },
+  "bugs": {
+    "url": "https://github.com/johnvouros/codexcoach/issues"
+  },
+  "type": "commonjs",
+  "bin": {
+    "codex-coach": "bin/codex-coach.js"
+  },
+  "files": [
+    "assets/",
+    "bin/",
+    "src/",
+    "!src/**/__pycache__/**",
+    "!src/**/*.pyc",
+    "!src/**/*.pyo",
+    "skills/",
+    ".codex-plugin/",
+    "install.sh",
+    "install.ps1",
+    "pyproject.toml",
+    "README.md",
+    "LICENSE"
+  ],
+  "keywords": [
+    "codex",
+    "coach",
+    "ai",
+    "developer-tools",
+    "prompting",
+    "productivity"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "test": "python3 -m unittest discover -s tests",
+    "pack:check": "npm pack --dry-run"
+  }
+}
