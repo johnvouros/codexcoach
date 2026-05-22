@@ -61,6 +61,10 @@ class ScanTests(unittest.TestCase):
         report = render_markdown_report(facts, generated_at=datetime(2026, 5, 21, tzinfo=UTC), expert=True)
 
         self.assertIn("# Codex Coach Report", report)
+        self.assertIn("## TL;DR: What To Change", report)
+        self.assertIn("- What to change:", report)
+        self.assertIn("- How: add the block below to", report)
+        self.assertIn("- What to paste:", report)
         self.assertIn("Token Efficiency", report)
         self.assertIn("43,700 cached", report)
         self.assertIn("9,300 uncached", report)

@@ -43,9 +43,9 @@ def render_markdown_report(
         "",
         "Plain English: this is a private local report about how Codex was used, where the sessions got expensive or repetitive, and what small instruction changes may improve the next run.",
         "",
-        "## Top Coaching Notes",
-        "",
     ]
+    lines.extend(_tldr_lines(suggestions, expert=expert))
+    lines.extend(["", "## Top Coaching Notes", ""])
     lines.extend(_coaching_notes(suggestions, limit=5 if expert else 3))
     lines.extend(_token_efficiency_lines(facts, expert=expert))
     lines.extend(["", "## Project Mix", ""])
@@ -398,6 +398,37 @@ def render_instruction_report(instruction_audit: dict[str, Any], *, generated_at
 
 def _coaching_notes(suggestions: list[dict[str, str]], *, limit: int) -> list[str]:
     return [f"- [{item['confidence']}] {item['title']}: {item['body']}" for item in suggestions[:limit]]
+
+
+def _tldr_lines(suggestions: list[dict[str, str]], *, expert: bool) -> list[str]:
+    lines = [
+        "## TL;DR: What To Change",
+        "",
+        "Plain English: start here. These are the most useful changes to review first, where to put them, and the exact text to paste if you agree.",
+        "",
+    ]
+    if not suggestions:
+        lines.append("No strong changes stood out.")
+        return lines
+
+    for index, suggestion in enumerate(suggestions[: 5 if expert else 3], start=1):
+        paste_target = suggestion.get("paste_target", "custom instructions or project AGENTS.md")
+        suggested_text = suggestion.get("suggested_text")
+        lines.extend(
+            [
+                f"### {index}. {suggestion['title']}",
+                "",
+                f"- What to change: {suggestion['body']}",
+                f"- How: add the block below to {paste_target}. Remove it later if it does not improve your workflow.",
+                f"- Paste into: {paste_target}",
+            ]
+        )
+        if suggested_text:
+            lines.extend(["- What to paste:", "", "```md", str(suggested_text), "```"])
+        else:
+            lines.append("- What to paste: review the detailed suggestion below before writing a new instruction.")
+        lines.append("")
+    return lines
 
 
 def _suggestion_lines(suggestion: dict[str, Any]) -> list[str]:
