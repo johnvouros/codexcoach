@@ -87,14 +87,6 @@ Suggest custom instruction changes
 - Real-time prompt linting through `codex-coach lint-prompt`.
 - Instruction Playbook Audit: review global custom instructions and project `AGENTS.md` files for stale mode locks, scope leaks, missing verification rules, secrets, and active projects without a playbook.
 
-## Visual Examples
-
-![How Codex Coach works](assets/examples/how-it-works.png)
-
-![Prompt lint example](assets/examples/prompt-lint.png)
-
-![Project capsules example](assets/examples/project-capsules.png)
-
 ## Brand Assets
 
 - Main README banner: `assets/brand/codex-coach-banner.png`
