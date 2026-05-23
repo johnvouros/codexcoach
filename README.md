@@ -83,7 +83,7 @@ Suggest custom instruction changes
 - Project capsules: redacted per-project workflow summaries with suggested local instructions.
 - Prompt rewrites: safe templates for vague prompts without storing full prompt text.
 - Confidence-scored suggestions: low, medium, or high confidence improvement notes.
-- TL;DR action plan: beginner-friendly changes with where to make them, whether they belong in settings, a prompt, or `AGENTS.md`, and exact Markdown snippets.
+- TL;DR action plan: skimmable beginner-friendly changes with where to make them, whether they belong in settings, a prompt, or `AGENTS.md`, and collapsible Markdown snippets.
 - Since Last Report: a small Markdown trend panel comparing the current report with the previous report baseline.
 - Token efficiency: cached vs uncached input, output, routing, and context-budget recommendations.
 - Beginner and expert report modes.

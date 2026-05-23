@@ -37,7 +37,8 @@ class CliAndInstallTests(unittest.TestCase):
             self.assertEqual(code, 0)
             self.assertTrue((coach_home / "reports" / "latest.md").exists())
             report = coach_home / "reports" / "latest.md"
-            self.assertIn("Mode: beginner", report.read_text(encoding="utf-8"))
+            self.assertIn("| Generated | Window | Mode |", report.read_text(encoding="utf-8"))
+            self.assertIn("| `3650d` | `beginner` |", report.read_text(encoding="utf-8"))
             self.assertIn("No previous report detected yet", report.read_text(encoding="utf-8"))
             self.assertTrue((coach_home / "facts" / "report-latest.json").exists())
 

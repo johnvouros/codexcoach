@@ -24,35 +24,34 @@ def render_markdown_report(
     totals = facts.get("totals", {})
     prompt_quality = facts.get("prompt_quality", {})
     suggestions = build_suggestions(facts)
+    verification_rate = _verification_rate(facts)
     lines: list[str] = [
         "# Codex Coach Report",
         "",
-        f"Generated: {generated_at.isoformat(timespec='seconds')}",
-        f"Window: {facts.get('since') or 'all available local logs'}",
-        f"Mode: {'expert' if expert else 'beginner'}",
+        "| Generated | Window | Mode |",
+        "|---|---|---|",
+        f"| `{generated_at.isoformat(timespec='seconds')}` | `{facts.get('since') or 'all available local logs'}` | `{'expert' if expert else 'beginner'}` |",
     ]
     lines.extend(_comparison_lines(facts, previous_facts))
     lines.extend([
-        "## Summary",
+        "## At A Glance",
         "",
-        f"- Sessions: {totals.get('sessions', 0)}",
-        f"- Turns: {totals.get('turns', 0)}",
-        f"- User messages: {totals.get('user_messages', 0)}",
-        f"- Tool calls: {totals.get('tool_calls', 0)}",
-        f"- Verification tool calls: {totals.get('verification_tool_calls', 0)}",
-        f"- Errors detected: {totals.get('errors', 0)}",
-        f"- Compactions: {totals.get('compactions', 0)}",
-        f"- Prompt quality average: {prompt_quality.get('average_score', 0)}/10",
-        "",
-        "Plain English: this is a private local report about how Codex was used, where the sessions got expensive or repetitive, and what small instruction changes may improve the next run.",
+        "| Metric | Value |",
+        "|---|---:|",
+        f"| Sessions | {_fmt_int(int(totals.get('sessions', 0) or 0))} |",
+        f"| Turns | {_fmt_int(int(totals.get('turns', 0) or 0))} |",
+        f"| User messages | {_fmt_int(int(totals.get('user_messages', 0) or 0))} |",
+        f"| Tool calls | {_fmt_int(int(totals.get('tool_calls', 0) or 0))} |",
+        f"| Verification rate | {verification_rate:.1%} |",
+        f"| Errors detected | {_fmt_int(int(totals.get('errors', 0) or 0))} |",
+        f"| Compactions | {_fmt_int(int(totals.get('compactions', 0) or 0))} |",
+        f"| Prompt clarity | {prompt_quality.get('average_score', 0)}/10 |",
         "",
     ])
     lines.extend(_tldr_lines(suggestions, expert=expert))
-    lines.extend(["", "## Top Coaching Notes", ""])
-    lines.extend(_coaching_notes(suggestions, limit=5 if expert else 3))
     lines.extend(_token_efficiency_lines(facts, expert=expert))
     lines.extend(["", "## Project Mix", ""])
-    lines.append("Plain English: these are the projects where Codex spent the most work in this window. High tool-call counts usually mean implementation, diagnosis, or verification-heavy sessions.")
+    lines.append("Where Codex spent the most work.")
     lines.append("")
     projects = facts.get("projects", [])[:8]
     if projects:
@@ -68,24 +67,29 @@ def render_markdown_report(
         lines.append("No project activity found.")
 
     lines.extend(["", "## Project Capsules", ""])
-    lines.append("Plain English: a project capsule is a tiny memory card for a repo. Add one to that repo's `AGENTS.md` when Codex keeps needing to rediscover the same workflow.")
-    lines.append("")
     capsules = facts.get("project_capsules", [])[:5]
     if capsules:
+        lines.append("| Project | Pattern | Suggested AGENTS.md cue |")
+        lines.append("|---|---|---|")
         for capsule in capsules:
-            lines.append(f"- `{capsule.get('project')}`: {capsule.get('likely_workflow')}. {capsule.get('recommended_instruction')}")
+            lines.append(
+                f"| `{capsule.get('project')}` | {capsule.get('likely_workflow')} | "
+                f"{capsule.get('recommended_instruction')} |"
+            )
     else:
         lines.append("No project capsules available.")
 
     lines.extend(_instruction_playbook_lines(facts.get("instruction_audit", {}), expert=expert))
 
     lines.extend(["", "## Prompt Quality", ""])
-    lines.append("Plain English: short prompts are fine when the context is obvious. When Codex guesses wrong, add the target, symptom, and success state.")
+    lines.append("Short prompts are fine when context is obvious. If Codex guesses, add target, symptom, and success state.")
     lines.append("")
     categories = prompt_quality.get("categories", {})
     if categories:
+        lines.append("| Category | Count |")
+        lines.append("|---|---:|")
         for name in ("excellent", "good", "needs_work"):
-            lines.append(f"- {name.replace('_', ' ').title()}: {categories.get(name, 0)}")
+            lines.append(f"| {name.replace('_', ' ').title()} | {categories.get(name, 0)} |")
     else:
         lines.append("- No user prompts found.")
 
@@ -99,11 +103,15 @@ def render_markdown_report(
                 f"{item.get('rewrite')}"
             )
 
-    lines.extend(["", "## Suggested Improvements", ""])
-    lines.append("Review these before pasting anything. Use global custom instructions for personal habits that should apply everywhere; use a project `AGENTS.md` for repo-specific commands, stack rules, or verification steps.")
-    lines.append("")
-    for suggestion in suggestions:
-        lines.extend(_suggestion_lines(suggestion))
+    if expert:
+        lines.extend(["", "## Suggested Improvements", ""])
+        lines.append("Full detail for review. Nothing is applied automatically.")
+        lines.append("")
+        for suggestion in suggestions:
+            lines.extend(_suggestion_lines(suggestion))
+    else:
+        lines.extend(["", "## Suggestion Files", ""])
+        lines.append("Want the pasteable patches? Run `codex-coach suggest-config --since 7d` and review `~/.codex-coach/suggestions/`.")
 
     skill_opportunities = build_skill_opportunities(facts)
     if skill_opportunities:
@@ -307,9 +315,9 @@ def build_suggestions(facts: dict[str, Any]) -> list[dict[str, str]]:
                 "id": "right-size-reasoning",
                 "title": "Right-size reasoning effort",
                 "confidence": _confidence(ratio, high=0.75, medium=0.6),
-                "body": "High reasoning dominates recent turns. Default simple status, search, and small edit tasks to medium; reserve high/xhigh for ambiguous debugging, architecture, security, or broad refactors.",
-                "paste_target": "Global custom instructions",
-                "suggested_text": "Use medium effort for routine status checks, targeted searches, formatting, small edits, and deterministic reports. Escalate to high or xhigh only for ambiguous debugging, architecture decisions, security review, broad refactors, or production-risk changes.",
+                "body": "High reasoning dominates recent turns. To actually reduce effort, choose medium in the Codex UI or CLI for routine work. A custom instruction can only remind Codex of the preference; it cannot override a manually selected model or effort setting.",
+                "paste_target": "Codex UI/CLI effort setting plus optional Global custom instructions",
+                "suggested_text": "For model effort, prefer medium for routine status checks, targeted searches, formatting, small edits, and deterministic reports. Use high or xhigh only for ambiguous debugging, architecture decisions, security review, broad refactors, or production-risk changes. If the Codex client has already fixed the model or effort setting, follow that setting and mention when the task appears over- or under-scoped for it.",
             }
         )
 
@@ -463,9 +471,9 @@ def build_token_suggestions(facts: dict[str, Any]) -> list[dict[str, str]]:
                 "id": "route-routine-work-to-mini",
                 "title": "Route routine work to mini or medium",
                 "confidence": "high" if high_effort / turns >= 0.5 else "medium",
-                "body": "High effort appears often enough to merit routing. Use mini/medium for scan, report, grep, formatting, and deterministic edits; escalate only for ambiguous debugging, architecture, security, and risky decisions.",
-                "paste_target": "Global custom instructions",
-                "suggested_text": "Prefer cheaper routine routing: use mini or medium reasoning for scanning, reports, greps, formatting, and deterministic small edits. Escalate only when the task needs judgment, tradeoff analysis, or high-risk debugging.",
+                "body": "High effort appears often enough to merit routing. To actually save tokens or credits, start routine scan, report, grep, formatting, and deterministic edit tasks with mini or medium in the Codex UI or CLI. A custom instruction is only a reminder; it does not override the selected setting.",
+                "paste_target": "Codex UI/CLI effort setting plus optional Global custom instructions",
+                "suggested_text": "Prefer cheaper routine routing: start scans, reports, greps, formatting, and deterministic small edits with mini or medium reasoning when the Codex client allows it. Escalate only when the task needs judgment, tradeoff analysis, or high-risk debugging. This is a preference, not an automatic override of the UI or CLI model/effort setting.",
             }
         )
 
@@ -558,9 +566,9 @@ def _coaching_notes(suggestions: list[dict[str, str]], *, limit: int) -> list[st
 
 def _tldr_lines(suggestions: list[dict[str, str]], *, expert: bool) -> list[str]:
     lines = [
-        "## TL;DR: What To Change",
+        "## TL;DR",
         "",
-        "Plain English: start here. These are optional recommendations, not errors. Each item says where to make the change and whether it belongs in settings, a prompt, or a project file.",
+        "Start here. These are optional, not errors.",
         "",
     ]
     if not suggestions:
@@ -575,15 +583,14 @@ def _tldr_lines(suggestions: list[dict[str, str]], *, expert: bool) -> list[str]
             [
                 f"### {index}. {suggestion['title']}",
                 "",
-                "- Do you need to act now? No. This is a suggested improvement you can try.",
-                f"- What it means: {suggestion['body']}",
-                f"- Where to do it: {location['where']}",
-                f"- Settings or prompt? {location['scope']}",
-                f"- How to apply it: {location['action']}",
+                f"- Why: {suggestion['body']}",
+                f"- Where: {location['where']}",
+                f"- Scope: {location['scope']}",
+                f"- Do: {location['action']}",
             ]
         )
         if suggested_text:
-            lines.extend(["- What to paste:", "", "```md", str(suggested_text), "```"])
+            lines.extend(_collapsible_paste_block(str(suggested_text)))
         else:
             lines.append("- What to paste: review the detailed suggestion below before writing a new instruction.")
         lines.append("")
@@ -597,10 +604,9 @@ def _suggestion_lines(suggestion: dict[str, Any]) -> list[str]:
         f"### {suggestion['title']}",
         "",
         f"- Confidence: {suggestion['confidence']}",
-        "- Do you need to act now? No. This is a recommendation, not a failure.",
-        f"- What it means: {suggestion['body']}",
-        f"- Where to do it: {location['where']}",
-        f"- Settings or prompt? {location['scope']}",
+        f"- Why: {suggestion['body']}",
+        f"- Where: {location['where']}",
+        f"- Scope: {location['scope']}",
     ]
     suggested_text = suggestion.get("suggested_text")
     if paste_target and suggested_text:
@@ -608,9 +614,7 @@ def _suggestion_lines(suggestion: dict[str, Any]) -> list[str]:
             [
                 f"- How to apply it: {location['action']}",
                 "",
-                "```md",
-                str(suggested_text),
-                "```",
+                *_collapsible_paste_block(str(suggested_text)),
             ]
         )
     lines.append("")
@@ -638,7 +642,7 @@ def _token_efficiency_lines(facts: dict[str, Any], *, expert: bool) -> list[str]
     cache_ratio = float(usage.get("cache_ratio", 0.0) or 0.0)
     uncached_ratio = float(usage.get("uncached_ratio", 0.0) or 0.0)
 
-    lines.append("Plain English: cached input is repeated context Codex could reuse more cheaply. Uncached input is new context, and that is usually where the biggest savings are.")
+    lines.append("Cached input is repeated context. Uncached input is new context and usually the bigger savings target.")
     lines.append("")
     lines.append(
         f"- Input: {_fmt_int(input_tokens)} "
@@ -669,31 +673,16 @@ def _token_efficiency_lines(facts: dict[str, Any], *, expert: bool) -> list[str]
                 "",
                 "Token-saving moves:",
                 "",
-                "Plain English: these are optional habit changes. They are not errors. Use settings for habits you want everywhere; use a prompt only for one task; use `AGENTS.md` for one project.",
+                "Optional. UI/CLI settings control actual model and effort; instructions only guide behavior.",
                 "",
+                "| Move | Confidence | First action |",
+                "|---|---|---|",
             ]
         )
         for item in token_suggestions[: 5 if expert else 3]:
             paste_target = item.get("paste_target", "instructions")
             location = _placement_help(str(paste_target))
-            lines.append(f"### {item['title']}")
-            lines.append("")
-            lines.append(f"- Confidence: {item['confidence']}")
-            lines.append("- Do you need to act now? No. This is a suggestion to reduce repeated context or cost.")
-            lines.append(f"- What it means: {item['body']}")
-            lines.append(f"- Where to do it: {location['where']}")
-            lines.append(f"- Settings or prompt? {location['scope']}")
-            if item.get("suggested_text"):
-                lines.extend(
-                    [
-                        f"- How to apply it: {location['action']}",
-                        "",
-                        "```md",
-                        str(item["suggested_text"]),
-                        "```",
-                        "",
-                    ]
-                )
+            lines.append(f"| {item['title']} | {item['confidence']} | {location['action']} |")
     else:
         lines.extend(
             [
@@ -722,6 +711,12 @@ def _token_efficiency_lines(facts: dict[str, Any], *, expert: bool) -> list[str]
 
 def _placement_help(paste_target: str) -> dict[str, str]:
     target = paste_target.lower()
+    if "ui/cli effort setting" in target:
+        return {
+            "where": "Codex UI model/effort picker or CLI model/effort flag. Optional reminder text can go in Global custom instructions.",
+            "scope": "Actual setting change, not just a prompt. Custom instructions cannot override a manually selected UI/CLI effort.",
+            "action": "For routine work, start the session with mini or medium in the UI/CLI. Paste the reminder only if you want Codex to call out over- or under-scoped effort.",
+        }
     if "instruction review checklist" in target:
         return {
             "where": "Open the Instruction Playbook section of this report first.",
@@ -763,6 +758,21 @@ def _placement_help(paste_target: str) -> dict[str, str]:
         "scope": "Use settings for global habits, a prompt for one-off tasks, and AGENTS.md for one project.",
         "action": "Paste the block only if the recommendation matches how you want Codex to behave.",
     }
+
+
+def _collapsible_paste_block(text: str) -> list[str]:
+    return [
+        "- What to paste:",
+        "",
+        "<details>",
+        "<summary>Show snippet</summary>",
+        "",
+        "```md",
+        text,
+        "```",
+        "",
+        "</details>",
+    ]
 
 
 def _instruction_playbook_lines(instruction_audit: dict[str, Any], *, expert: bool) -> list[str]:
@@ -815,6 +825,7 @@ def _instruction_playbook_lines(instruction_audit: dict[str, Any], *, expert: bo
 def _render_suggestion_patch(suggestion: dict[str, str]) -> str:
     paste_target = suggestion.get("paste_target", "custom instructions or project AGENTS.md")
     suggested_text = suggestion.get("suggested_text") or f"- {suggestion['body']}"
+    location = _placement_help(paste_target)
     return "\n".join(
         [
             f"# Suggested Codex Instruction Change: {suggestion['title']}",
@@ -829,7 +840,13 @@ def _render_suggestion_patch(suggestion: dict[str, str]) -> str:
             "",
             "## Suggested Text",
             "",
-            f"Paste into: {paste_target}",
+            f"Target: {paste_target}",
+            "",
+            f"Where: {location['where']}",
+            "",
+            f"Scope: {location['scope']}",
+            "",
+            f"How: {location['action']}",
             "",
             "```md",
             suggested_text,

@@ -13,8 +13,10 @@ Recommended suggestion format:
 Common suggestions:
 
 ```md
-When a task is simple, local, or status-oriented, default to medium reasoning. Reserve high or xhigh for ambiguous debugging, architecture, security, broad refactors, or unclear failures.
+For model effort, prefer medium for routine status checks, targeted searches, formatting, small edits, and deterministic reports. Use high or xhigh only for ambiguous debugging, architecture decisions, security review, broad refactors, or production-risk changes. If the Codex client has already fixed the model or effort setting, follow that setting and mention when the task appears over- or under-scoped for it.
 ```
+
+Model or effort guidance is a preference, not an automatic override. The actual model and effort are controlled by the Codex UI or CLI setting.
 
 ```md
 Before saying a fix is complete, run the smallest meaningful verification command or inspect the live/runtime state when applicable.
