@@ -59,7 +59,7 @@ class CliAndInstallTests(unittest.TestCase):
             )
             self.assertEqual(code, 0)
             self.assertIn("## Expert Metrics", report.read_text(encoding="utf-8"))
-            self.assertIn("Previous baseline: generated", report.read_text(encoding="utf-8"))
+            self.assertIn("Previous report detected, but it is too recent to compare meaningfully", report.read_text(encoding="utf-8"))
 
             code = main(["--home", str(home), "--codex-home", str(FIXTURE_CODEX), "--coach-home", str(coach_home), "suggest-config", "--since", "3650d"])
             self.assertEqual(code, 0)

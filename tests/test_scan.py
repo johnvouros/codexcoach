@@ -79,6 +79,9 @@ class ScanTests(unittest.TestCase):
         self.assertIn("Custom instructions cannot override", report)
         self.assertIn("Prompt Quality", report)
         self.assertIn("Project Capsules", report)
+        self.assertIn("## Weekly Check-In", report)
+        self.assertIn("Set a weekly Codex Coach check-in every 7 days", report)
+        self.assertIn("Recommended setting: `medium` intelligence", report)
         self.assertIn("Prompt rewrites to try", report)
         self.assertIn("Confidence: medium", report)
         self.assertNotIn("sk-live-secretsecretsecretsecretsecret", report)
@@ -108,6 +111,22 @@ class ScanTests(unittest.TestCase):
         self.assertIn("| Verification rate |", report)
         self.assertIn("| Uncached input / turn | 8,000.0 | 3,100.0 |", report)
         self.assertIn("`[+", report)
+
+    def test_report_skips_comparison_when_previous_report_is_too_recent(self) -> None:
+        facts = scan_logs(FIXTURE_CODEX)
+        previous = json.loads(json.dumps(facts))
+        previous["generated_at"] = "2026-05-23T03:15:45+00:00"
+
+        report = render_markdown_report(
+            facts,
+            generated_at=datetime(2026, 5, 23, 3, 20, tzinfo=UTC),
+            previous_facts=previous,
+        )
+
+        self.assertIn("Previous report detected, but it is too recent to compare meaningfully", report)
+        self.assertIn("Most recent baseline: generated `2026-05-23T03:15:45+00:00`", report)
+        self.assertNotIn("| Habit | Previous | Current | Change | Trend |", report)
+        self.assertNotIn("Plain English: this compares the current report", report)
 
     def test_suggestion_files_are_review_artifacts(self) -> None:
         facts = scan_logs(FIXTURE_CODEX)

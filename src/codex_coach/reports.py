@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import json
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
+
+MIN_COMPARISON_BASELINE_AGE = timedelta(days=7)
 
 
 def write_json_facts(facts: dict[str, Any], path: Path) -> None:
@@ -32,7 +34,7 @@ def render_markdown_report(
         "|---|---|---|",
         f"| `{generated_at.isoformat(timespec='seconds')}` | `{facts.get('since') or 'all available local logs'}` | `{'expert' if expert else 'beginner'}` |",
     ]
-    lines.extend(_comparison_lines(facts, previous_facts))
+    lines.extend(_comparison_lines(facts, previous_facts, generated_at=generated_at))
     lines.extend([
         "## At A Glance",
         "",
@@ -119,6 +121,8 @@ def render_markdown_report(
         for item in skill_opportunities[:5]:
             lines.append(f"- `{item['project']}`: {item['title']} - {item['body']}")
 
+    lines.extend(_weekly_checkin_lines())
+
     if expert:
         lines.extend(["", "## Expert Metrics", ""])
         lines.append(f"- Models: `{facts.get('models', {})}`")
@@ -149,7 +153,39 @@ def write_markdown_report(report: str, reports_dir: Path, *, generated_at: datet
     return latest, weekly
 
 
-def _comparison_lines(facts: dict[str, Any], previous_facts: dict[str, Any] | None) -> list[str]:
+def _weekly_checkin_lines() -> list[str]:
+    prompt = (
+        "Set a weekly Codex Coach check-in every 7 days. Use medium intelligence for the routine review. "
+        "Each week, run `codex-coach report --since 7d`, read `~/.codex-coach/reports/latest.md`, "
+        "compare it with the previous report, and give me a concise TL;DR with the top 3 changes and exact next actions. "
+        "Escalate to high only if the report shows security risk, production risk, repeated failures, or major architecture concerns."
+    )
+    return [
+        "",
+        "## Weekly Check-In",
+        "",
+        "Optional. Codex app users can paste this to set a 7-day heartbeat. CLI/VS Code users can run `codex-coach report --since 7d` manually or use the installer's weekly schedule.",
+        "",
+        "Recommended setting: `medium` intelligence for the routine weekly review; escalate only for risky or ambiguous findings.",
+        "",
+        "<details>",
+        "<summary>Prompt to paste into Codex</summary>",
+        "",
+        "```text",
+        prompt,
+        "```",
+        "",
+        "</details>",
+        "",
+    ]
+
+
+def _comparison_lines(
+    facts: dict[str, Any],
+    previous_facts: dict[str, Any] | None,
+    *,
+    generated_at: datetime,
+) -> list[str]:
     lines = ["", "## Since Last Report", ""]
     if not isinstance(previous_facts, dict) or not previous_facts:
         lines.append("No previous report detected yet. This report becomes the baseline for the next comparison.")
@@ -158,6 +194,25 @@ def _comparison_lines(facts: dict[str, Any], previous_facts: dict[str, Any] | No
 
     previous_since = previous_facts.get("since") or "all available local logs"
     previous_generated = previous_facts.get("generated_at") or "unknown time"
+    previous_generated_at = _parse_generated_at(previous_generated)
+    if previous_generated_at is None:
+        lines.append(
+            "Previous report detected, but its generated time is unavailable. "
+            "This report becomes the baseline for the next reliable comparison."
+        )
+        lines.append("")
+        return lines
+    baseline_age = generated_at - previous_generated_at
+    if baseline_age < MIN_COMPARISON_BASELINE_AGE:
+        lines.append(
+            "Previous report detected, but it is too recent to compare meaningfully. "
+            "Codex Coach waits for a baseline at least 7 days old before showing trend results."
+        )
+        lines.append("")
+        lines.append(f"Most recent baseline: generated `{previous_generated}` for window `{previous_since}`.")
+        lines.append("")
+        return lines
+
     lines.append(
         "Plain English: this compares the current report with the last report Codex Coach generated, "
         "so you can see whether habits improved, stayed steady, or need attention."
@@ -227,6 +282,18 @@ def _comparison_lines(facts: dict[str, Any], previous_facts: dict[str, Any] | No
     lines.append("Trend key: `+` means improving, `-` means drifting, `=` means basically unchanged.")
     lines.append("")
     return lines
+
+
+def _parse_generated_at(value: Any) -> datetime | None:
+    if not isinstance(value, str) or not value.strip():
+        return None
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=UTC)
+    return parsed.astimezone(UTC)
 
 
 def _comparison_row(

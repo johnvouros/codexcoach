@@ -86,6 +86,7 @@ Suggest custom instruction changes
 - TL;DR action plan: skimmable beginner-friendly changes with where to make them, whether they belong in settings, a prompt, or `AGENTS.md`, and collapsible Markdown snippets.
 - Since Last Report: a small Markdown trend panel comparing the current report with the previous report baseline.
 - Token efficiency: cached vs uncached input, output, routing, and context-budget recommendations.
+- Weekly Check-In: a pasteable Codex app heartbeat prompt with recommended medium intelligence for routine 7-day reviews.
 - Beginner and expert report modes.
 - Skill opportunities: repeated workflow patterns that may deserve a reusable Codex skill.
 - Real-time prompt linting through `codex-coach lint-prompt`.
