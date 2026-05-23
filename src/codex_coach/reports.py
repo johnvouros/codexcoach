@@ -560,7 +560,7 @@ def _tldr_lines(suggestions: list[dict[str, str]], *, expert: bool) -> list[str]
     lines = [
         "## TL;DR: What To Change",
         "",
-        "Plain English: start here. These are the most useful changes to review first, where to put them, and the exact text to paste if you agree.",
+        "Plain English: start here. These are optional recommendations, not errors. Each item says where to make the change and whether it belongs in settings, a prompt, or a project file.",
         "",
     ]
     if not suggestions:
@@ -570,13 +570,16 @@ def _tldr_lines(suggestions: list[dict[str, str]], *, expert: bool) -> list[str]
     for index, suggestion in enumerate(suggestions[: 5 if expert else 3], start=1):
         paste_target = suggestion.get("paste_target", "custom instructions or project AGENTS.md")
         suggested_text = suggestion.get("suggested_text")
+        location = _placement_help(paste_target)
         lines.extend(
             [
                 f"### {index}. {suggestion['title']}",
                 "",
-                f"- What to change: {suggestion['body']}",
-                f"- How: add the block below to {paste_target}. Remove it later if it does not improve your workflow.",
-                f"- Paste into: {paste_target}",
+                "- Do you need to act now? No. This is a suggested improvement you can try.",
+                f"- What it means: {suggestion['body']}",
+                f"- Where to do it: {location['where']}",
+                f"- Settings or prompt? {location['scope']}",
+                f"- How to apply it: {location['action']}",
             ]
         )
         if suggested_text:
@@ -588,18 +591,22 @@ def _tldr_lines(suggestions: list[dict[str, str]], *, expert: bool) -> list[str]
 
 
 def _suggestion_lines(suggestion: dict[str, Any]) -> list[str]:
+    paste_target = suggestion.get("paste_target")
+    location = _placement_help(str(paste_target or "custom instructions or project AGENTS.md"))
     lines = [
         f"### {suggestion['title']}",
         "",
         f"- Confidence: {suggestion['confidence']}",
-        f"- Why: {suggestion['body']}",
+        "- Do you need to act now? No. This is a recommendation, not a failure.",
+        f"- What it means: {suggestion['body']}",
+        f"- Where to do it: {location['where']}",
+        f"- Settings or prompt? {location['scope']}",
     ]
-    paste_target = suggestion.get("paste_target")
     suggested_text = suggestion.get("suggested_text")
     if paste_target and suggested_text:
         lines.extend(
             [
-                f"- Paste into: {paste_target}",
+                f"- How to apply it: {location['action']}",
                 "",
                 "```md",
                 str(suggested_text),
@@ -657,13 +664,29 @@ def _token_efficiency_lines(facts: dict[str, Any], *, expert: bool) -> list[str]
 
     token_suggestions = build_token_suggestions(facts)
     if token_suggestions:
-        lines.extend(["", "Token-saving moves:"])
+        lines.extend(
+            [
+                "",
+                "Token-saving moves:",
+                "",
+                "Plain English: these are optional habit changes. They are not errors. Use settings for habits you want everywhere; use a prompt only for one task; use `AGENTS.md` for one project.",
+                "",
+            ]
+        )
         for item in token_suggestions[: 5 if expert else 3]:
-            lines.append(f"- [{item['confidence']}] {item['title']}: {item['body']}")
+            paste_target = item.get("paste_target", "instructions")
+            location = _placement_help(str(paste_target))
+            lines.append(f"### {item['title']}")
+            lines.append("")
+            lines.append(f"- Confidence: {item['confidence']}")
+            lines.append("- Do you need to act now? No. This is a suggestion to reduce repeated context or cost.")
+            lines.append(f"- What it means: {item['body']}")
+            lines.append(f"- Where to do it: {location['where']}")
+            lines.append(f"- Settings or prompt? {location['scope']}")
             if item.get("suggested_text"):
                 lines.extend(
                     [
-                        f"  Paste into: {item.get('paste_target', 'instructions')}",
+                        f"- How to apply it: {location['action']}",
                         "",
                         "```md",
                         str(item["suggested_text"]),
@@ -695,6 +718,51 @@ def _token_efficiency_lines(facts: dict[str, Any], *, expert: bool) -> list[str]
                 )
 
     return lines
+
+
+def _placement_help(paste_target: str) -> dict[str, str]:
+    target = paste_target.lower()
+    if "instruction review checklist" in target:
+        return {
+            "where": "Open the Instruction Playbook section of this report first.",
+            "scope": "This is a review step, not something to paste into a chat prompt.",
+            "action": "Read the finding, then decide whether the matching custom instruction or AGENTS.md file should change.",
+        }
+    if "skill" in target:
+        return {
+            "where": "Advanced: create or update a Codex skill, or put the simpler version in the project AGENTS.md file.",
+            "scope": "Use a skill for a repeated workflow across projects. Use AGENTS.md for one project.",
+            "action": "Start with AGENTS.md unless you already know you want a reusable skill.",
+        }
+    if "each active project" in target:
+        return {
+            "where": "In each active project folder, open or create a file named AGENTS.md.",
+            "scope": "Project file. This affects only that project, not every Codex chat.",
+            "action": "Paste the block into AGENTS.md for projects where this advice actually applies.",
+        }
+    if "global custom instructions" in target and "project" in target:
+        return {
+            "where": "Codex settings -> Custom instructions, or the project AGENTS.md file.",
+            "scope": "Use settings if you want this everywhere. Use AGENTS.md if it should apply only to one repo.",
+            "action": "If unsure, put it in AGENTS.md first so the habit stays scoped to one project.",
+        }
+    if "project agents" in target or "agents.md" in target:
+        return {
+            "where": "In the project folder, open or create a file named AGENTS.md.",
+            "scope": "Project file. This is better than a prompt when the rule should stay with the repo.",
+            "action": "Paste the block into AGENTS.md, then ask Codex to use that project normally.",
+        }
+    if "global custom instructions" in target or "custom instructions" in target:
+        return {
+            "where": "Codex settings -> Custom instructions.",
+            "scope": "Settings, not the chat prompt. Use this for habits you want Codex to follow everywhere.",
+            "action": "Open Codex settings, edit Custom instructions, paste the block below, then remove it later if it does not help.",
+        }
+    return {
+        "where": paste_target or "Custom instructions or AGENTS.md.",
+        "scope": "Use settings for global habits, a prompt for one-off tasks, and AGENTS.md for one project.",
+        "action": "Paste the block only if the recommendation matches how you want Codex to behave.",
+    }
 
 
 def _instruction_playbook_lines(instruction_audit: dict[str, Any], *, expert: bool) -> list[str]:
