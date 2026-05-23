@@ -72,10 +72,18 @@ def main(argv: list[str] | None = None) -> int:
             print(f"Wrote facts to {paths.facts_dir / 'latest.json'}")
             return 0
         if args.command == "report":
+            previous_facts = _read_json_facts(paths.facts_dir / "report-latest.json")
             facts = _scan(paths, args.since)
             generated_at = datetime.now(UTC)
-            report_text = render_markdown_report(facts, generated_at=generated_at, expert=args.expert, mode=args.mode)
+            report_text = render_markdown_report(
+                facts,
+                generated_at=generated_at,
+                expert=args.expert,
+                mode=args.mode,
+                previous_facts=previous_facts,
+            )
             latest, weekly = write_markdown_report(report_text, paths.reports_dir, generated_at=generated_at)
+            write_json_facts(facts, paths.facts_dir / "report-latest.json")
             print(f"Wrote report to {latest}")
             print(f"Wrote weekly copy to {weekly}")
             return 0
@@ -124,6 +132,16 @@ def _scan(paths, since: str) -> dict:
     write_json_facts(facts, paths.facts_dir / "latest.json")
     write_json_facts(facts["instruction_audit"], paths.instructions_dir / "index.json")
     return facts
+
+
+def _read_json_facts(path: Path) -> dict | None:
+    if not path.exists():
+        return None
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    return data if isinstance(data, dict) else None
 
 
 def _instructions(paths, command: str, since: str) -> int:

@@ -74,6 +74,7 @@ Suggest custom instruction changes
 - `~/.codex-coach/reports/latest.md`
 - `~/.codex-coach/reports/weekly-YYYY-MM-DD.md`
 - `~/.codex-coach/facts/latest.json`
+- `~/.codex-coach/facts/report-latest.json`
 - `~/.codex-coach/instructions/index.json`
 - `~/.codex-coach/suggestions/*.patch.md`
 
@@ -83,6 +84,7 @@ Suggest custom instruction changes
 - Prompt rewrites: safe templates for vague prompts without storing full prompt text.
 - Confidence-scored suggestions: low, medium, or high confidence improvement notes.
 - TL;DR action plan: plain-English changes with where to paste them and exact Markdown snippets.
+- Since Last Report: a small Markdown trend panel comparing the current report with the previous report baseline.
 - Token efficiency: cached vs uncached input, output, routing, and context-budget recommendations.
 - Beginner and expert report modes.
 - Skill opportunities: repeated workflow patterns that may deserve a reusable Codex skill.

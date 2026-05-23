@@ -61,6 +61,8 @@ class ScanTests(unittest.TestCase):
         report = render_markdown_report(facts, generated_at=datetime(2026, 5, 21, tzinfo=UTC), expert=True)
 
         self.assertIn("# Codex Coach Report", report)
+        self.assertIn("## Since Last Report", report)
+        self.assertIn("No previous report detected yet", report)
         self.assertIn("## TL;DR: What To Change", report)
         self.assertIn("- What to change:", report)
         self.assertIn("- How: add the block below to", report)
@@ -77,6 +79,30 @@ class ScanTests(unittest.TestCase):
         self.assertNotIn("sk-live-secretsecretsecretsecretsecret", report)
         self.assertNotIn("/home/alice/private-app/src/auth.py", report)
         self.assertNotIn("https://example.com/private-ticket", report)
+
+    def test_report_compares_with_previous_report_facts(self) -> None:
+        facts = scan_logs(FIXTURE_CODEX)
+        previous = json.loads(json.dumps(facts))
+        previous["generated_at"] = "2026-05-14T00:00:00+00:00"
+        previous["totals"]["errors"] = 4
+        previous["totals"]["compactions"] = 3
+        previous["totals"]["verification_tool_calls"] = 1
+        previous["prompt_quality"]["average_score"] = 5.0
+        previous["token_efficiency"]["usage"]["uncached_input_tokens_per_turn"] = 8000
+
+        report = render_markdown_report(
+            facts,
+            generated_at=datetime(2026, 5, 21, tzinfo=UTC),
+            previous_facts=previous,
+        )
+
+        self.assertIn("## Since Last Report", report)
+        self.assertIn("Previous baseline: generated `2026-05-14T00:00:00+00:00`", report)
+        self.assertIn("| Habit | Previous | Current | Change | Trend |", report)
+        self.assertIn("| Prompt clarity | 5.0/10 |", report)
+        self.assertIn("| Verification rate |", report)
+        self.assertIn("| Uncached input / turn | 8,000.0 | 3,100.0 |", report)
+        self.assertIn("`[+", report)
 
     def test_suggestion_files_are_review_artifacts(self) -> None:
         facts = scan_logs(FIXTURE_CODEX)

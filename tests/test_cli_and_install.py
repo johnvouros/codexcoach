@@ -38,6 +38,8 @@ class CliAndInstallTests(unittest.TestCase):
             self.assertTrue((coach_home / "reports" / "latest.md").exists())
             report = coach_home / "reports" / "latest.md"
             self.assertIn("Mode: beginner", report.read_text(encoding="utf-8"))
+            self.assertIn("No previous report detected yet", report.read_text(encoding="utf-8"))
+            self.assertTrue((coach_home / "facts" / "report-latest.json").exists())
 
             code = main(
                 [
@@ -56,6 +58,7 @@ class CliAndInstallTests(unittest.TestCase):
             )
             self.assertEqual(code, 0)
             self.assertIn("## Expert Metrics", report.read_text(encoding="utf-8"))
+            self.assertIn("Previous baseline: generated", report.read_text(encoding="utf-8"))
 
             code = main(["--home", str(home), "--codex-home", str(FIXTURE_CODEX), "--coach-home", str(coach_home), "suggest-config", "--since", "3650d"])
             self.assertEqual(code, 0)

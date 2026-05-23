@@ -17,6 +17,7 @@ def render_markdown_report(
     generated_at: datetime | None = None,
     expert: bool = False,
     mode: str = "beginner",
+    previous_facts: dict[str, Any] | None = None,
 ) -> str:
     generated_at = generated_at or datetime.now(UTC)
     expert = expert or mode == "expert"
@@ -29,7 +30,9 @@ def render_markdown_report(
         f"Generated: {generated_at.isoformat(timespec='seconds')}",
         f"Window: {facts.get('since') or 'all available local logs'}",
         f"Mode: {'expert' if expert else 'beginner'}",
-        "",
+    ]
+    lines.extend(_comparison_lines(facts, previous_facts))
+    lines.extend([
         "## Summary",
         "",
         f"- Sessions: {totals.get('sessions', 0)}",
@@ -43,7 +46,7 @@ def render_markdown_report(
         "",
         "Plain English: this is a private local report about how Codex was used, where the sessions got expensive or repetitive, and what small instruction changes may improve the next run.",
         "",
-    ]
+    ])
     lines.extend(_tldr_lines(suggestions, expert=expert))
     lines.extend(["", "## Top Coaching Notes", ""])
     lines.extend(_coaching_notes(suggestions, limit=5 if expert else 3))
@@ -136,6 +139,159 @@ def write_markdown_report(report: str, reports_dir: Path, *, generated_at: datet
     latest.write_text(report, encoding="utf-8")
     weekly.write_text(report, encoding="utf-8")
     return latest, weekly
+
+
+def _comparison_lines(facts: dict[str, Any], previous_facts: dict[str, Any] | None) -> list[str]:
+    lines = ["", "## Since Last Report", ""]
+    if not isinstance(previous_facts, dict) or not previous_facts:
+        lines.append("No previous report detected yet. This report becomes the baseline for the next comparison.")
+        lines.append("")
+        return lines
+
+    previous_since = previous_facts.get("since") or "all available local logs"
+    previous_generated = previous_facts.get("generated_at") or "unknown time"
+    lines.append(
+        "Plain English: this compares the current report with the last report Codex Coach generated, "
+        "so you can see whether habits improved, stayed steady, or need attention."
+    )
+    lines.append("")
+    lines.append(f"Previous baseline: generated `{previous_generated}` for window `{previous_since}`.")
+    lines.append("")
+    lines.append("| Habit | Previous | Current | Change | Trend |")
+    lines.append("|---|---:|---:|---:|---|")
+
+    rows = [
+        _comparison_row(
+            "Prompt clarity",
+            _prompt_average(previous_facts),
+            _prompt_average(facts),
+            formatter=lambda value: f"{value:.1f}/10",
+            delta_formatter=lambda value: _fmt_signed(value, suffix=""),
+            higher_is_better=True,
+            scale=2.0,
+        ),
+        _comparison_row(
+            "Verification rate",
+            _verification_rate(previous_facts),
+            _verification_rate(facts),
+            formatter=lambda value: f"{value:.1%}",
+            delta_formatter=lambda value: _fmt_signed(value * 100, suffix=" pts"),
+            higher_is_better=True,
+            scale=0.25,
+        ),
+        _comparison_row(
+            "Errors detected",
+            _total_value(previous_facts, "errors"),
+            _total_value(facts, "errors"),
+            formatter=lambda value: _fmt_int(int(value)),
+            delta_formatter=lambda value: _fmt_signed(value),
+            higher_is_better=False,
+            scale=max(1.0, _total_value(previous_facts, "errors"), _total_value(facts, "errors")),
+        ),
+        _comparison_row(
+            "Compactions",
+            _total_value(previous_facts, "compactions"),
+            _total_value(facts, "compactions"),
+            formatter=lambda value: _fmt_int(int(value)),
+            delta_formatter=lambda value: _fmt_signed(value),
+            higher_is_better=False,
+            scale=max(1.0, _total_value(previous_facts, "compactions"), _total_value(facts, "compactions")),
+        ),
+    ]
+
+    if _has_token_usage(previous_facts) or _has_token_usage(facts):
+        previous_uncached = _uncached_per_turn(previous_facts)
+        current_uncached = _uncached_per_turn(facts)
+        rows.append(
+            _comparison_row(
+                "Uncached input / turn",
+                previous_uncached,
+                current_uncached,
+                formatter=lambda value: _fmt_float(value),
+                delta_formatter=lambda value: _fmt_signed(value),
+                higher_is_better=False,
+                scale=max(1.0, previous_uncached, current_uncached),
+            )
+        )
+
+    lines.extend(rows)
+    lines.append("")
+    lines.append("Trend key: `+` means improving, `-` means drifting, `=` means basically unchanged.")
+    lines.append("")
+    return lines
+
+
+def _comparison_row(
+    label: str,
+    previous: float,
+    current: float,
+    *,
+    formatter,
+    delta_formatter,
+    higher_is_better: bool,
+    scale: float,
+) -> str:
+    delta = current - previous
+    score_delta = delta if higher_is_better else -delta
+    if abs(score_delta) < 0.0001:
+        trend = "steady"
+    else:
+        trend = "better" if score_delta > 0 else "watch"
+    return (
+        f"| {label} | {formatter(previous)} | {formatter(current)} | "
+        f"{delta_formatter(delta)} | `{_trend_bar(score_delta, scale=scale)}` {trend} |"
+    )
+
+
+def _trend_bar(score_delta: float, *, scale: float) -> str:
+    if abs(score_delta) < 0.0001:
+        return "[==========]"
+    width = 10
+    filled = max(1, min(width, int(round(abs(score_delta) / max(scale, 0.0001) * width))))
+    char = "+" if score_delta > 0 else "-"
+    return f"[{char * filled}{'.' * (width - filled)}]"
+
+
+def _total_value(facts: dict[str, Any], key: str) -> float:
+    totals = facts.get("totals", {}) if isinstance(facts, dict) else {}
+    return _as_float(totals.get(key, 0) if isinstance(totals, dict) else 0)
+
+
+def _prompt_average(facts: dict[str, Any]) -> float:
+    prompt_quality = facts.get("prompt_quality", {}) if isinstance(facts, dict) else {}
+    return _as_float(prompt_quality.get("average_score", 0) if isinstance(prompt_quality, dict) else 0)
+
+
+def _verification_rate(facts: dict[str, Any]) -> float:
+    tool_calls = max(1.0, _total_value(facts, "tool_calls"))
+    return _total_value(facts, "verification_tool_calls") / tool_calls
+
+
+def _has_token_usage(facts: dict[str, Any]) -> bool:
+    token_efficiency = facts.get("token_efficiency", {}) if isinstance(facts, dict) else {}
+    return isinstance(token_efficiency, dict) and token_efficiency.get("status") == "observed"
+
+
+def _uncached_per_turn(facts: dict[str, Any]) -> float:
+    token_efficiency = facts.get("token_efficiency", {}) if isinstance(facts, dict) else {}
+    usage = token_efficiency.get("usage", {}) if isinstance(token_efficiency, dict) else {}
+    return _as_float(usage.get("uncached_input_tokens_per_turn", 0) if isinstance(usage, dict) else 0)
+
+
+def _as_float(value: Any) -> float:
+    try:
+        return float(value or 0)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _fmt_signed(value: float, *, suffix: str = "") -> str:
+    if abs(value) < 0.0001:
+        return f"0{suffix}"
+    sign = "+" if value > 0 else ""
+    if float(value).is_integer():
+        return f"{sign}{int(value):,}{suffix}"
+    return f"{sign}{value:,.1f}{suffix}"
 
 
 def build_suggestions(facts: dict[str, Any]) -> list[dict[str, str]]:
