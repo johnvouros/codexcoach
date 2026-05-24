@@ -29,6 +29,8 @@ codex-coach report --since 7d --mode expert
 ```
 
 4. Read `~/.codex-coach/reports/latest.md` and summarize the highest-impact findings.
+   When mentioning generated files in chat, format them as clickable absolute Markdown links, for example:
+   `[latest.md](/home/example/.codex-coach/reports/latest.md)`.
 
 5. For config improvements, generate review files:
 
@@ -59,6 +61,7 @@ codex-coach lint-prompt "fix the login bug"
 
 ## What To Surface
 
+- Report files: include clickable absolute Markdown links for `latest.md`, the dated weekly report, and `latest.json` when those files were generated.
 - Project capsules: explain the likely workflow, top friction, and suggested local instruction.
 - Prompt rewrites: show the redacted preview and the safer template, not the raw original prompt.
 - Confidence: keep low-confidence suggestions tentative; high-confidence suggestions can be presented as the next best habit.
