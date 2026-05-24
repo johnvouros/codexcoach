@@ -4,7 +4,28 @@
 
 Codex Coach is a local-first usage coach for Codex users. It reads Codex session logs on your machine, generates redacted habit reports, and suggests reviewable improvements to your Codex configuration and project instructions.
 
-## Install
+## Quick Start
+
+1. Install it:
+
+```sh
+npm install -g codex-coach
+codex-coach install
+```
+
+2. Restart Codex, then ask in a Codex prompt:
+
+```text
+Coach my Codex usage
+```
+
+3. Read the output report:
+
+- Latest report: `~/.codex-coach/reports/latest.md`
+- Weekly copy: `~/.codex-coach/reports/weekly-YYYY-MM-DD.md`
+- Example: [demo report](docs/demo-report.md)
+
+## Install Options
 
 With npm:
 
@@ -60,6 +81,20 @@ Inside Codex, ask:
 Coach my Codex usage
 Show my weekly Codex Coach report
 Suggest custom instruction changes
+```
+
+## Weekly Heartbeat
+
+In the Codex app, paste this prompt to ask Codex to set a weekly check-in:
+
+```text
+Set a weekly Codex Coach check-in every 7 days. Use medium intelligence for the routine review. Each week, run `codex-coach report --since 7d`, read `~/.codex-coach/reports/latest.md`, compare it with the previous report, and give me a concise TL;DR with the top 3 changes and exact next actions. Escalate to high only if the report shows security risk, production risk, repeated failures, or major architecture concerns.
+```
+
+CLI, VS Code, Cursor, and Windsurf users can run the same review manually:
+
+```sh
+codex-coach report --since 7d
 ```
 
 ## Privacy Model
